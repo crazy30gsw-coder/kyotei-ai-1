@@ -1,5 +1,12 @@
 [
   {
+    "id": 1768175379003,
+    "title": "【テスト】OPENAI_API_KEY未設定（仮記事）",
+    "summary": "OPENAI_API_KEY が未登録なので仮記事を生成しました。Secretsを確認してください。",
+    "date": "2026-01-11T23:49:39.039Z",
+    "link": "./posts/1768175379003.html"
+  },
+  {
     "id": 1768174861112,
     "title": "【テスト】記事ページ生成 OK",
     "summary": "記事ページ（/posts/ID.html）が自動で作られました。",
