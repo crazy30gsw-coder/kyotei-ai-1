@@ -28,4 +28,12 @@ header{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0
 .badge{font-size:11px;background:#f1f2f4;border:1px solid var(--line);padding:2px 8px;border-radius:999px}
 .time{font-variant-numeric:tabular-nums}
 
-.side{display:flex;flex-direction:column
+.side{display:flex;flex-direction:column;gap:14px}
+.list{padding:8px 12px}
+.list a{display:block;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.list a:last-child{border-bottom:none}
+.footer{max-width:var(--w);margin:18px auto;padding:16px 12px;color:var(--muted);font-size:12px}
+
+@media (max-width: 940px){
+  .grid{grid-template-columns:1fr}
+}
