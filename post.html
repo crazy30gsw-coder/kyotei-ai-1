@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>記事</title>
+  <link rel="stylesheet" href="./style.css"/>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a class="brand" href="./index.html">まとめ<b>速報</b></a>
+    <nav class="nav">
+      <a href="./index.html?cat=all">最新</a>
+      <a href="./index.html?cat=kyotei">競艇</a>
+      <a href="./index.html?cat=keiba">競馬</a>
+      <a href="./index.html?cat=card">クレカ</a>
+      <a href="./index.html?cat=news">ニュース</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="grid">
+    <main class="card">
+      <div class="card-h" id="ptitle">読み込み中...</div>
+      <div style="padding:12px" id="pbody"></div>
+    </main>
+
+    <aside class="side">
+      <div class="ad">広告枠（後でAdSense等）</div>
+      <div class="card">
+        <div class="card-h">関連記事</div>
+        <div class="list" id="related"></div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="footer">※当サイトは情報の要約・紹介を目的としています。最終判断はご自身で。</div>
+</div>
+
+<script>
+  const id = new URLSearchParams(location.search).get("id");
+
+  fetch("./posts.json?ts=" + Date.now())
+    .then(r => r.json())
+    .then(data => {
+      const p = data.posts.find(x => x.id === id) || data.posts[0];
+      document.title = p.title;
+      document.getElementById("ptitle").textContent = p.title;
+
+      document.getElementById("pbody").innerHTML = `
+        <div class="meta">
+          <span class="time">${p.time}</span>
+          <span class="badge">${p.cat}</span>
+        </div>
+        <div style="margin-top:10px;line-height:1.8">
+          <p>${p.excerpt}</p>
+          <p>（ここに本文を入れていく想定。まずは雛形です）</p>
+          <p><a href="./index.html">← 一覧に戻る</a></p>
+        </div>
+      `;
+
+      const rel = document.getElementById("related");
+      rel.innerHTML = data.posts.filter(x => x.id !== p.id).slice(0,8)
+        .map(x => `<a href="./post.html?id=${encodeURIComponent(x.id)}">${x.title}</a>`).join("");
+    });
+</script>
+</body>
+</html>
