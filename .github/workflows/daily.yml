@@ -1,33 +1,29 @@
 name: Daily Update
-
 on:
   schedule:
-    # 毎日 07:05 JST = 22:05 UTC（前日）
-    - cron: "5 22 * * *"
+    - cron: "0 15 * * *"   # 日本時間 0:00（UTC 15:00）
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  update:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: "3.11"
+          node-version: 20
 
-      - name: Generate daily post
-        run: python tools/generate.py
+      - name: Update posts.json
+        run: node tools/update_posts.js
 
-      - name: Commit and push if changed
+      - name: Commit & push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git diff --cached --quiet || git commit -m "Daily update"
+          git add posts.json
+          git commit -m "daily update" || echo "no changes"
           git push
