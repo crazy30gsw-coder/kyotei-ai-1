@@ -1,4 +1,4 @@
-// tools/update_posts.js
+す// tools/update_posts.js
 // RSSから最新記事を拾って posts.json に追加（本文コピペなし／要約は自作）
 
 import fs from "fs";
@@ -37,4 +37,25 @@ function extractItems(xml) {
   for (const block of blocks.slice(0, 10)) {
     const title = (block.match(/<title><!CDATA\[([\s\S]*?)\]><\/title>/) ||
                    block.match(/<title>([\s\S]*?)<\/title>/))?.[1]?.trim();
-    const link  = (
+    const link  = (import fs from "fs";
+
+const FILE = "posts.json";
+
+const now = new Date().toISOString();
+
+let posts = [];
+if (fs.existsSync(FILE)) {
+  posts = JSON.parse(fs.readFileSync(FILE, "utf-8"));
+}
+
+posts.unshift({
+  id: Date.now(),
+  title: "テスト記事：競艇AI予想が自動更新されました",
+  summary: "GitHub Actionsから自動生成されたテスト記事です。",
+  date: now,
+  link: "#"
+});
+
+fs.writeFileSync(FILE, JSON.stringify(posts, null, 2));
+
+console.log("posts.json updated");
