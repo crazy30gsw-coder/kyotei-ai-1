@@ -1,6 +1,6 @@
 import fs from "fs";
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const KKK = process.env.KKK;
 
 function nowId() {
   return Date.now();
@@ -14,7 +14,7 @@ function ensureArrayPosts(data) {
 }
 
 async function genByOpenAI() {
-  if (!OPENAI_API_KEY) {
+  if (!O)KKK {
     // キー未設定でも動作確認できるようにフォールバック
     return {
       title: "【テスト】OPENAI_API_KEY未設定（仮記事）",
