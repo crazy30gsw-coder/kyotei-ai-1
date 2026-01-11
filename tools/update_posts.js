@@ -1,35 +1,40 @@
 // tools/update_posts.js
-// posts.json を毎日1件追加（まずは自動更新の動作確認用）
-// 後で「RSS取得→要約→カテゴリ振り分け」に進化させる
+// RSSから最新記事を拾って posts.json に追加（本文コピペなし／要約は自作）
 
 import fs from "fs";
 
-const path = "posts.json";
-const now = new Date();
-const jst = new Intl.DateTimeFormat("ja-JP", {
-  timeZone: "Asia/Tokyo",
-  year: "numeric", month: "2-digit", day: "2-digit",
-  hour: "2-digit", minute: "2-digit"
-}).format(now).replace(/\//g, "-");
+const POSTS_PATH = "posts.json";
+const MAX_POSTS = 80;
 
-let data = { posts: [] };
-if (fs.existsSync(path)) {
-  data = JSON.parse(fs.readFileSync(path, "utf8"));
+// まずは動作確認用のRSS（あとで増やせる）
+const RSS_SOURCES = [
+  { cat: "news", name: "NHK主要", url: "https://www.nhk.or.jp/rss/news/cat0.xml" },
+  { cat: "news", name: "ITmedia NEWS", url: "https://rss.itmedia.co.jp/rss/2.0/news_bursts.xml" }
+];
+
+function jstNow() {
+  const now = new Date();
+  return new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit"
+  }).format(now).replace(/\//g, "-");
 }
 
-const nextId = String((data.posts?.[0]?.id ? Number(data.posts[0].id) : data.posts.length) + 1);
+function loadPosts() {
+  if (!fs.existsSync(POSTS_PATH)) return { posts: [] };
+  try { return JSON.parse(fs.readFileSync(POSTS_PATH, "utf8")); }
+  catch { return { posts: [] }; }
+}
 
-const newPost = {
-  id: nextId,
-  cat: "kyotei",
-  time: jst,
-  title: `【自動更新テスト】${jst} の更新`,
-  excerpt: "Actionsでposts.jsonを自動更新しています（テスト投稿）。",
-  thumb: ""
-};
+function savePosts(data) {
+  fs.writeFileSync(POSTS_PATH, JSON.stringify(data, null, 2), "utf8");
+}
 
-// 最新が先頭
-data.posts = [newPost, ...(data.posts || [])].slice(0, 80);
-
-fs.writeFileSync(path, JSON.stringify(data, null, 2), "utf8");
-console.log("updated posts.json with id =", nextId);
+function extractItems(xml) {
+  const items = [];
+  const blocks = xml.match(/<item[\s\S]*?<\/item>/g) || [];
+  for (const block of blocks.slice(0, 10)) {
+    const title = (block.match(/<title><!CDATA\[([\s\S]*?)\]><\/title>/) ||
+                   block.match(/<title>([\s\S]*?)<\/title>/))?.[1]?.trim();
+    const link  = (
