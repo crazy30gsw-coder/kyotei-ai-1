@@ -14,7 +14,7 @@ function ensureArrayPosts(data) {
 }
 
 async function genByOpenAI() {
-  if (!O)KKK {
+  if (!O) OPENAI_API_KEY
     // キー未設定でも動作確認できるようにフォールバック
     return {
       title: "【テスト】OPENAI_API_KEY未設定（仮記事）",
