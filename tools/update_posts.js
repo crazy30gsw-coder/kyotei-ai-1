@@ -64,7 +64,7 @@ async function genByOpenAI() {
       body: text,
     };
   }
-  return parsed;
+  
 }
 
 function renderHtml({ title, body }) {
