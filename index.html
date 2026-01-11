@@ -76,5 +76,35 @@
       pop.innerHTML = data.posts.slice(0,8).map(p => `<a href="./post.html?id=${encodeURIComponent(p.id)}">${p.title}</a>`).join("");
     });
 </script>
-</body>
+</body><script>
+(async () => {
+  try {
+    const res = await fetch("./posts.json", { cache: "no-store" });
+    const posts = await res.json();
+
+    const root = document.getElementById("posts") || (() => {
+      const d = document.createElement("div");
+      d.id = "posts";
+      document.body.prepend(d);
+      return d;
+    })();
+
+    root.innerHTML = `
+      <h2>最新記事</h2>
+      <ul>
+        ${posts.map(p => `
+          <li>
+            <a href="${p.link || '#'}">${p.title}</a>
+            <div style="opacity:.7;font-size:.9em">${p.date}</div>
+            <div>${p.summary || ""}</div>
+          </li>
+        `).join("")}
+      </ul>
+    `;
+  } catch (e) {
+    document.body.insertAdjacentHTML("afterbegin", "<p>posts.json 読み込み失敗</p>");
+    console.error(e);
+  }
+})();
+</script>
 </html>
