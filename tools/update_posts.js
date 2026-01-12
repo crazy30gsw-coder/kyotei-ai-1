@@ -64,9 +64,6 @@ async function genByOpenAI() {
       body: text,
     };
   }
-  
-}
-
 function renderHtml({ title, body }) {
   // 超シンプルな記事ページ
   return `<!doctype html>
