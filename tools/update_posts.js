@@ -144,4 +144,32 @@ async function main() {
 main().catch((e) => {
   console.error(e);
   process.exit(1);
+});import fs from "fs";
+
+const POSTS_JSON = "posts.json";
+
+function loadPosts() {
+  if (!fs.existsSync(POSTS_JSON)) return [];
+  const raw = fs.readFileSync(POSTS_JSON, "utf-8").trim();
+  if (!raw) return [];
+  const parsed = JSON.parse(raw);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+function savePosts(posts) {
+  fs.writeFileSync(POSTS_JSON, JSON.stringify(posts, null, 2) + "\n", "utf-8");
+}
+
+const posts = loadPosts();
+
+posts.unshift({
+  id: Date.now(),
+  title: "【テスト】自動投稿が成功しました",
+  summary: "GitHub Actions から自動で追加されたテスト記事です。",
+  date: new Date().toISOString(),
+  link: `./posts/${Date.now()}.html`,
 });
+
+savePosts(posts);
+
+console.log("OK: posts.json updated. total =", posts.length);
