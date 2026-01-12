@@ -1,97 +1,13 @@
 import fs from "fs";
+import path from "path";
+import fetch from "node-fetch";
 
-const KKK = process.env.KKK;
+const POSTS_JSON = "posts.json";
+const POSTS_DIR = "posts";
 
-function nowId() {
-  return Date.now();
-}
-
-function ensureArrayPosts(data) {
-  // posts.json が壊れてても復旧できるようにする
-  if (Array.isArray(data)) return data;
-  if (data && Array.isArray(data.posts)) return data.posts;
-  return [];
-}
-
-async function genByOpenAI() {
-  if (!O) OPENAI_API_KEY
-    // キー未設定でも動作確認できるようにフォールバック
-    return {
-      title: "【テスト】OPENAI_API_KEY未設定（仮記事）",
-      summary: "OPENAI_API_KEY が未登録なので仮記事を生成しました。Secretsを確認してください。",
-      body: "OPENAI_API_KEY が未登録です。GitHub Secrets に OPENAI_API_KEY を追加してください。",
-    };
-  }
-
-  // OpenAI Responses API（推奨）
-  const prompt = `
-あなたは競艇記事の編集者です。
-初心者にも分かるように、今日の「買い目の考え方」を短めに記事化してください。
-・断定しすぎない（オッズ/直前気配/取消など不確定要素は断定しない）
-・見出し付き
-・最後に注意書き（ギャンブルは自己責任、的中保証なし）
-出力は必ずJSONで：
-{"title":"...", "summary":"...", "body":"..."}
-`;
-
-  const res = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${OPENAI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4.1-mini",
-      input: prompt,
-    }),
-  });
-
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`OpenAI API error: ${res.status} ${t}`);
-  }
-
-  const json = await res.json();
-  const text = json.output_text || "";
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    // たまにJSON以外が混ざる想定で救済
-    parsed = {
-      title: "【生成失敗】JSON解析できませんでした",
-      summary: "OpenAIの応答がJSON形式になりませんでした。プロンプトを調整してください。",
-      body: text,
-    };
-  }
-function renderHtml({ title, body }) {
-  // 超シンプルな記事ページ
-  return `<!doctype html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>${escapeHtml(title)}</title>
-  <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;max-width:820px;margin:24px auto;padding:0 14px;line-height:1.7}
-    h1{font-size:22px;margin:0 0 14px}
-    .meta{color:#666;font-size:13px;margin-bottom:18px}
-    .box{background:#111;color:#fff;padding:10px 12px;border-radius:10px;font-size:13px}
-    pre{white-space:pre-wrap}
-  </style>
-</head>
-<body>
-  <h1>${escapeHtml(title)}</h1>
-  <div class="meta">${new Date().toLocaleString("ja-JP")}</div>
-  <div>${nl2br(escapeHtml(body))}</div>
-  <hr/>
-  <div class="box">※本記事は情報提供です。投票は自己責任でお願いします（的中保証なし）。</div>
-</body>
-</html>`;
-}
-
-function escapeHtml(s = "") {
-  return String(s)
+// ---------- util ----------
+function escapeHtml(str = "") {
+  return str
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -99,74 +15,108 @@ function escapeHtml(s = "") {
     .replaceAll("'", "&#039;");
 }
 
-function nl2br(s = "") {
-  return String(s).replaceAll("\n", "<br/>");
+function renderHtml({ title, body }) {
+  return `<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${escapeHtml(title)}</title>
+<style>
+body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial;max-width:760px;margin:40px auto;padding:0 16px;line-height:1.8}
+h1{font-size:1.6em}
+</style>
+</head>
+<body>
+<h1>${escapeHtml(title)}</h1>
+<div>${body}</div>
+</body>
+</html>`;
 }
 
+// ---------- main ----------
 async function main() {
-  // posts.json 読み込み（なければ新規）
-  let raw = "[]";
-  try {
-    raw = fs.readFileSync("posts.json", "utf8");
-  } catch {}
-  let data;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    data = [];
+  const apiKey = process.env.KKK;
+  if (!apiKey) {
+    throw new Error("OPENAI API key (KKK) が設定されていません");
   }
-  const posts = ensureArrayPosts(data);
 
-  // 1記事生成
-  const g = await genByOpenAI();
-  const id = nowId();
-  const postPath = `posts/${id}.html`;
+  // posts.json 読み込み
+  let posts = [];
+  if (fs.existsSync(POSTS_JSON)) {
+    posts = JSON.parse(fs.readFileSync(POSTS_JSON, "utf-8"));
+  }
 
-  fs.mkdirSync("posts", { recursive: true });
-  fs.writeFileSync(postPath, renderHtml({ title: g.title, body: g.body }), "utf8");
+  // OpenAI に記事生成を依頼（テスト用・必ずJSONで返させる）
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "あなたは日本語の記事生成AIです。必ずJSONのみで返してください。",
+        },
+        {
+          role: "user",
+          content: `
+以下のJSON形式で記事を1本生成してください。
 
-  // 一覧に追加（先頭）
-  posts.unshift({
-    id,
-    title: g.title,
-    summary: g.summary,
-    date: new Date().toISOString(),
-    link: `./${postPath}`,
+{
+  "title": "記事タイトル",
+  "summary": "記事の要約",
+  "body": "<p>HTML本文</p>"
+}
+          `,
+        },
+      ],
+      temperature: 0.7,
+    }),
   });
 
-  fs.writeFileSync("posts.json", JSON.stringify(posts, null, 2), "utf8");
-  console.log("OK: added", postPath);
+  const json = await res.json();
+  const text = json.choices?.[0]?.message?.content || "";
+
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    parsed = {
+      title: "【生成失敗】JSON解析エラー",
+      summary: "OpenAIの返答がJSONになりませんでした。",
+      body: `<pre>${escapeHtml(text)}</pre>`,
+    };
+  }
+
+  // 記事ID & パス
+  const id = Date.now();
+  if (!fs.existsSync(POSTS_DIR)) fs.mkdirSync(POSTS_DIR);
+  const htmlPath = `${POSTS_DIR}/${id}.html`;
+
+  // HTML生成
+  const html = renderHtml(parsed);
+  fs.writeFileSync(htmlPath, html, "utf-8");
+
+  // posts.json 先頭に追加
+  posts.unshift({
+    id,
+    title: parsed.title,
+    summary: parsed.summary,
+    date: new Date().toISOString(),
+    link: `./${htmlPath}`,
+  });
+
+  fs.writeFileSync(POSTS_JSON, JSON.stringify(posts, null, 2), "utf-8");
+
+  console.log("記事を1本追加しました:", parsed.title);
 }
 
 main().catch((e) => {
   console.error(e);
   process.exit(1);
-});import fs from "fs";
-
-const POSTS_JSON = "posts.json";
-
-function loadPosts() {
-  if (!fs.existsSync(POSTS_JSON)) return [];
-  const raw = fs.readFileSync(POSTS_JSON, "utf-8").trim();
-  if (!raw) return [];
-  const parsed = JSON.parse(raw);
-  return Array.isArray(parsed) ? parsed : [];
-}
-
-function savePosts(posts) {
-  fs.writeFileSync(POSTS_JSON, JSON.stringify(posts, null, 2) + "\n", "utf-8");
-}
-
-const posts = loadPosts();
-
-posts.unshift({
-  id: Date.now(),
-  title: "【テスト】自動投稿が成功しました",
-  summary: "GitHub Actions から自動で追加されたテスト記事です。",
-  date: new Date().toISOString(),
-  link: `./posts/${Date.now()}.html`,
 });
-
-savePosts(posts);
-
-console.log("OK: posts.json updated. total =", posts.length);
