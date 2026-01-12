@@ -1,110 +1,11 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>まとめ速報（自動更新）</title>
-  <link rel="stylesheet" href="./style.css"/>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>まとめ速報</title>
+  <meta http-equiv="refresh" content="0; url=./index.html">
 </head>
 <body>
-<header>
-  <div class="header-inner">
-    <div class="brand">まとめ<b>速報</b></div>
-    <nav class="nav">
-      <a href="./index.html?cat=all">最新</a>
-      <a href="./index.html?cat=kyotei">競艇</a>
-      <a href="./index.html?cat=keiba">競馬</a>
-      <a href="./index.html?cat=card">クレカ</a>
-      <a href="./index.html?cat=news">ニュース</a>
-    </nav>
-  </div>
-</header>
-
-<div class="wrap">
-  <div class="grid">
-    <main class="card">
-      <div class="card-h">最新記事</div>
-      <div id="posts"></div>
-    </main>
-
-    <aside class="side">
-      <div class="ad">広告枠（後でAdSense等）</div>
-
-      <div class="card">
-        <div class="card-h">人気記事</div>
-        <div class="list" id="popular"></div>
-      </div>
-
-      <div class="card">
-        <div class="card-h">おすすめ導線</div>
-        <div class="list">
-          <a href="#">note（有料予想）</a>
-          <a href="#">LINE（速報受け取り）</a>
-          <a href="#">固定ページ（免責/運営）</a>
-        </div>
-      </div>
-    </aside>
-  </div>
-
-  <div class="footer">※当サイトは情報の要約・紹介を目的としています。最終判断はご自身で。</div>
-</div>
-
-<script>
-  const params = new URLSearchParams(location.search);
-  const cat = params.get("cat") || "all";
-
-  fetch("./posts.json?ts=" + Date.now())
-    .then(r => r.json())
-    .then(data => {
-      const posts = (cat==="all") ? data.posts : data.posts.filter(p => p.cat === cat);
-      const el = document.getElementById("posts");
-      el.innerHTML = posts.map(p => `
-        <a class="post" href="./post.html?id=${encodeURIComponent(p.id)}">
-          <img class="thumb" src="${p.thumb || 'https://picsum.photos/240/160?random='+p.id}" alt="">
-          <div>
-            <div class="title">${p.title}</div>
-            <div class="meta">
-              <span class="time">${p.time}</span>
-              <span class="badge">${p.cat}</span>
-            </div>
-            <div class="ex">${p.excerpt || ""}</div>
-          </div>
-        </a>
-      `).join("");
-
-      const pop = document.getElementById("popular");
-      pop.innerHTML = data.posts.slice(0,8).map(p => `<a href="./post.html?id=${encodeURIComponent(p.id)}">${p.title}</a>`).join("");
-    });
-</script>
-</body><script>
-(async () => {
-  try {
-    const res = await fetch("./posts.json", { cache: "no-store" });
-    const posts = await res.json();
-
-    const root = document.getElementById("posts") || (() => {
-      const d = document.createElement("div");
-      d.id = "posts";
-      document.body.prepend(d);
-      return d;
-    })();
-
-    root.innerHTML = `
-      <h2>最新記事</h2>
-      <ul>
-        ${posts.map(p => `
-          <li>
-            <a href="${p.link || '#'}">${p.title}</a>
-            <div style="opacity:.7;font-size:.9em">${p.date}</div>
-            <div>${p.summary || ""}</div>
-          </li>
-        `).join("")}
-      </ul>
-    `;
-  } catch (e) {
-    document.body.insertAdjacentHTML("afterbegin", "<p>posts.json 読み込み失敗</p>");
-    console.error(e);
-  }
-})();
-</script>
+</body>
 </html>
