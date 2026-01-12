@@ -1,99 +1,156 @@
 import fs from "fs";
 import fetch from "node-fetch";
+import path from "path";
 
+// =====================
+// 環境変数
+// =====================
 const API_KEY = process.env.OPENAI_API_KEY || process.env.KKK;
 if (!API_KEY) {
-  throw new Error("OpenAI API key (OPENAI_API_KEY or KKK) が設定されていません");
+  console.error("❌ OpenAI API key が未設定 (OPENAI_API_KEY or KKK)");
+  process.exit(1);
 }
 
-const POSTS_PATH = "./posts.json";
-const POSTS_DIR = "./posts";
+// =====================
+// パス
+// =====================
+const ROOT = process.cwd();
+const POSTS_JSON = path.join(ROOT, "posts.json");
+const POSTS_DIR = path.join(ROOT, "posts");
 
-if (!fs.existsSync(POSTS_DIR)) {
-  fs.mkdirSync(POSTS_DIR, { recursive: true });
+// =====================
+// 初期化
+// =====================
+if (!fs.existsSync(POSTS_DIR)) fs.mkdirSync(POSTS_DIR, { recursive: true });
+if (!fs.existsSync(POSTS_JSON)) fs.writeFileSync(POSTS_JSON, "[]", "utf-8");
+
+// =====================
+// RSS設定（まずは1本で安定）
+// =====================
+const RSS_URL = "https://news.yahoo.co.jp/rss/topics/sports.xml";
+
+// =====================
+// RSS取得
+// =====================
+async function fetchRSS() {
+  const res = await fetch(RSS_URL);
+  if (!res.ok) throw new Error("RSS fetch failed");
+  return await res.text();
 }
 
-const BASE_PROMPT = `
-あなたは「競艇ニュースまとめ」編集長です。
-初心者にも分かりやすい競艇ニュース記事を1本書いてください。
+// =====================
+// RSS解析（正規表現は最小）
+// =====================
+function parseRSS(xml) {
+  const items = [];
+  const blocks = xml.split("<item>").slice(1);
+
+  for (const block of blocks.slice(0, 3)) {
+    const title = block.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/)?.[1];
+    const link = block.match(/<link>(.*?)<\/link>/)?.[1];
+    if (title && link) {
+      items.push({ title, link });
+    }
+  }
+  return items;
+}
+
+// =====================
+// AI要約
+// =====================
+async function summarize(title, url) {
+  const prompt = `
+以下のニュースを「競艇ニュースまとめ記事」として
+初心者向けに要約してください。
+
+タイトル: ${title}
+URL: ${url}
 
 出力形式（JSONのみ）:
 {
-  "title": "タイトル",
-  "summary": "50文字以内の概要",
+  "title": "記事タイトル",
+  "summary": "50文字以内",
   "body": "<p>本文HTML</p>"
 }
 `;
 
-async function createArticle() {
   const res = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": \`Bearer \${API_KEY}\`,
+      "Authorization": `Bearer ${API_KEY}`,
     },
     body: JSON.stringify({
       model: "gpt-4.1-mini",
-      input: BASE_PROMPT,
-      max_output_tokens: 800,
+      input: prompt,
+      max_output_tokens: 700,
     }),
   });
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error("OpenAI API error: " + text);
+    const t = await res.text();
+    throw new Error(t);
   }
 
   const data = await res.json();
-  const json = JSON.parse(data.output_text);
-  return json;
+  return JSON.parse(data.output_text);
 }
 
-function loadPosts() {
-  if (!fs.existsSync(POSTS_PATH)) return [];
-  return JSON.parse(fs.readFileSync(POSTS_PATH, "utf8"));
-}
-
-function savePosts(posts) {
-  fs.writeFileSync(POSTS_PATH, JSON.stringify(posts, null, 2));
-}
-
+// =====================
+// メイン
+// =====================
 async function main() {
-  const article = await createArticle();
+  console.log("▶ RSS取得中");
+  const xml = await fetchRSS();
 
-  const id = Date.now();
-  const htmlPath = \`\${POSTS_DIR}/\${id}.html\`;
+  console.log("▶ RSS解析");
+  const items = parseRSS(xml);
+  if (items.length === 0) {
+    console.log("⚠ 記事なし");
+    return;
+  }
 
-  fs.writeFileSync(
-    htmlPath,
-    \`<!doctype html>
+  const posts = JSON.parse(fs.readFileSync(POSTS_JSON, "utf-8"));
+
+  for (const item of items) {
+    if (posts.some(p => p.sourceUrl === item.link)) continue;
+
+    console.log("▶ 記事生成:", item.title);
+    const article = await summarize(item.title, item.link);
+
+    const id = Date.now();
+    const file = `${id}.html`;
+
+    fs.writeFileSync(
+      path.join(POSTS_DIR, file),
+      `<!doctype html>
 <html lang="ja">
-<head>
-<meta charset="utf-8">
-<title>\${article.title}</title>
-</head>
+<head><meta charset="utf-8"><title>${article.title}</title></head>
 <body>
-<h1>\${article.title}</h1>
-<p>\${article.summary}</p>
-\${article.body}
+<h1>${article.title}</h1>
+<p>${article.summary}</p>
+${article.body}
+<p><a href="${item.link}" target="_blank">元記事</a></p>
 </body>
-</html>\`
-  );
+</html>`,
+      "utf-8"
+    );
 
-  const posts = loadPosts();
-  posts.unshift({
-    id,
-    title: article.title,
-    summary: article.summary,
-    date: new Date().toISOString(),
-    link: \`/posts/\${id}.html\`,
-  });
+    posts.unshift({
+      id,
+      title: article.title,
+      summary: article.summary,
+      link: `/posts/${file}`,
+      sourceUrl: item.link,
+      date: new Date().toISOString()
+    });
+  }
 
-  savePosts(posts);
-  console.log("✅ 記事生成成功:", article.title);
+  fs.writeFileSync(POSTS_JSON, JSON.stringify(posts.slice(0, 50), null, 2));
+  console.log("✅ 更新完了");
 }
 
-main().catch((e) => {
-  console.error("❌ Error:", e);
+main().catch(err => {
+  console.error("❌ エラー", err);
   process.exit(1);
 });
