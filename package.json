@@ -1,0 +1,11 @@
+{
+  "name": "kyotei-matome",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "update": "node tools/update_posts.js"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  }
+}
