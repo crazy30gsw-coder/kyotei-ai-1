@@ -1,0 +1,18 @@
+{
+  "siteTitle": "競艇ニュースまとめ",
+  "maxNewPostsPerRun": 3,
+  "sources": [
+    {
+      "name": "Yahooニュース（スポーツ）",
+      "type": "rss",
+      "url": "https://news.yahoo.co.jp/rss/categories/sports.xml",
+      "category": "ニュース"
+    },
+    {
+      "name": "Yahooニュース（国内）",
+      "type": "rss",
+      "url": "https://news.yahoo.co.jp/rss/categories/domestic.xml",
+      "category": "ニュース"
+    }
+  ]
+}
