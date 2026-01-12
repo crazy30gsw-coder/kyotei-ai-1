@@ -1,3 +1,4 @@
+
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -63,21 +64,31 @@ function decodeEntities(s) {
 }
 
 function parseRssItems(xml) {
-  // RSS <item> or Atom <entry>
   const items = [];
-  const rssItems = xml.match(/<item[\\s\\S]*?<\\/item>/gi) || [];
-  const atomItems = xml.match(/<entry[\\s\\S]*?<\\/entry>/gi) || [];
 
-  const blocks = rssItems.length ? rssItems : atomItems;
+  // <item> で分割（正規表現を使わない）
+  const parts = xml.split("<item>").slice(1);
 
-  for (const block of blocks) {
-    const title = decodeEntities(stripCdata(pickTag(block, "title")));
-    let link = pickTag(block, "link");
+  for (const part of parts) {
+    const block = part.split("</item>")[0];
 
-    // Atom: <link href="..."/>
-    if (!link) {
-      const m = block.match(/<link[^>]*href="([^"]+)"[^>]*\\/>/i);
-      if (m) link = m[1];
+    const titleMatch = block.match(/<title>(.*?)<\/title>/i);
+    const linkMatch = block.match(/<link>(.*?)<\/link>/i);
+
+    if (!titleMatch || !linkMatch) continue;
+
+    const title = titleMatch[1]
+      .replace("<![CDATA[", "")
+      .replace("]]>", "")
+      .trim();
+
+    const link = linkMatch[1].trim();
+
+    items.push({ title, link });
+  }
+
+  return items;
+}
     }
 
     const pubDate =
