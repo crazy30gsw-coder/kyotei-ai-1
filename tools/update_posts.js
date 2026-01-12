@@ -1,142 +1,107 @@
 import fs from "fs";
+import path from "path";
+import crypto from "crypto";
 import fetch from "node-fetch";
 
+// ====== Config ======
 const API_KEY = process.env.OPENAI_API_KEY || process.env.KKK;
 if (!API_KEY) throw new Error("OpenAI API key (OPENAI_API_KEY or KKK) が設定されていません");
 
-const POSTS_PATH = "./posts.json";
+const CFG_PATH = "./sources.json";
+const POSTS_JSON = "./posts.json";
 const POSTS_DIR = "./posts";
 
-// GitHub Pagesで repo配下でも壊れないように「相対リンク」で出す
-const makePostLink = (id) => `posts/${id}.html`;
+const cfg = JSON.parse(fs.readFileSync(CFG_PATH, "utf8"));
+const SITE_TITLE = cfg.siteTitle || "まとめ速報";
+const MAX_NEW = Number(cfg.maxNewPostsPerRun || 3);
 
+// Ensure dirs/files
 if (!fs.existsSync(POSTS_DIR)) fs.mkdirSync(POSTS_DIR, { recursive: true });
+if (!fs.existsSync(POSTS_JSON)) fs.writeFileSync(POSTS_JSON, "[]", "utf8");
 
-const BASE_PROMPT = `
-あなたは「競艇ニュースまとめ」編集長。
-最新情報を初心者にも分かりやすく1記事書いてください。
-
-必ず「JSONだけ」を返してください（前後に文章禁止）。
-
-出力形式:
-{
-  "title": "タイトル",
-  "summary": "50文字以内の概要",
-  "body": "<p>本文HTML</p>"
-}
-`;
-
-// Responses APIの返りからテキストを抽出
-function extractTextFromResponses(data) {
-  // よくある形：data.output[].content[].text
-  try {
-    const out = data?.output ?? [];
-    for (const item of out) {
-      const content = item?.content ?? [];
-      for (const c of content) {
-        if (c?.type === "output_text" && typeof c?.text === "string") return c.text;
-        if (typeof c?.text === "string") return c.text;
-      }
-    }
-  } catch {}
-  // 予備：ありがちな別形
-  if (typeof data?.output_text === "string") return data.output_text;
-  if (typeof data?.text === "string") return data.text;
-  return "";
-}
-
-// モデルが前後に文章を付けてもJSON部分だけ抜く
-function safeJsonParse(text) {
-  const trimmed = (text || "").trim();
-  if (!trimmed) return null;
-
-  // 最初の { から最後の } までを切り出す
-  const start = trimmed.indexOf("{");
-  const end = trimmed.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) return null;
-
-  const jsonStr = trimmed.slice(start, end + 1);
-  return JSON.parse(jsonStr);
-}
-
-async function createArticle() {
-  const res = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-4.1-mini",
-      input: BASE_PROMPT,
-      max_output_tokens: 800,
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error("OpenAI API error: " + text);
-  }
-
-  const data = await res.json();
-  const text = extractTextFromResponses(data);
-  const obj = safeJsonParse(text);
-
-  if (!obj?.title || !obj?.summary || !obj?.body) {
-    throw new Error("AIの出力が想定JSONになってません: " + (text || "(empty)"));
-  }
-  return obj;
-}
+// ====== Helpers ======
+const sha1 = (s) => crypto.createHash("sha1").update(s).digest("hex").slice(0, 12);
 
 function loadPosts() {
-  if (!fs.existsSync(POSTS_PATH)) return [];
-  return JSON.parse(fs.readFileSync(POSTS_PATH, "utf8"));
+  return JSON.parse(fs.readFileSync(POSTS_JSON, "utf8"));
 }
-
 function savePosts(posts) {
-  fs.writeFileSync(POSTS_PATH, JSON.stringify(posts, null, 2), "utf8");
+  fs.writeFileSync(POSTS_JSON, JSON.stringify(posts, null, 2), "utf8");
 }
 
-async function main() {
-  const article = await createArticle();
-
-  const id = Date.now();
-  const filename = `${POSTS_DIR}/${id}.html`;
-
-  fs.writeFileSync(
-    filename,
-    `<!doctype html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${article.title}</title>
-</head>
-<body>
-  <h1>${article.title}</h1>
-  <p>${article.summary}</p>
-  ${article.body}
-  <p><a href="../index.html">← 戻る</a></p>
-</body>
-</html>`,
-    "utf8"
-  );
-
-  const posts = loadPosts();
-  posts.unshift({
-    id,
-    title: article.title,
-    summary: article.summary,
-    date: new Date().toISOString(),
-    link: makePostLink(id), // ← ここ超重要（先頭/なし）
-  });
-
-  savePosts(posts);
-
-  console.log("✅ 記事を追加しました:", article.title);
+function escapeHtml(str = "") {
+  return str
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
-main().catch((e) => {
-  console.error("❌ Error:", e);
-  process.exit(1);
-});
+async function fetchText(url) {
+  const res = await fetch(url, { redirect: "follow" });
+  if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${url}`);
+  return await res.text();
+}
+
+// Very small RSS parser (good enough for RSS2.0/Atom basic)
+function pickTag(xml, tag) {
+  const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"));
+  return m ? m[1].trim() : "";
+}
+function stripCdata(s) {
+  return s.replace(/^<!\CDATA\\[/, "").replace(/\\\]>$/, "");
+}
+function decodeEntities(s) {
+  return s
+    .replaceAll("&amp;", "&")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&#039;", "'");
+}
+
+function parseRssItems(xml) {
+  // RSS <item> or Atom <entry>
+  const items = [];
+  const rssItems = xml.match(/<item[\\s\\S]*?<\\/item>/gi) || [];
+  const atomItems = xml.match(/<entry[\\s\\S]*?<\\/entry>/gi) || [];
+
+  const blocks = rssItems.length ? rssItems : atomItems;
+
+  for (const block of blocks) {
+    const title = decodeEntities(stripCdata(pickTag(block, "title")));
+    let link = pickTag(block, "link");
+
+    // Atom: <link href="..."/>
+    if (!link) {
+      const m = block.match(/<link[^>]*href="([^"]+)"[^>]*\\/>/i);
+      if (m) link = m[1];
+    }
+
+    const pubDate =
+      pickTag(block, "pubDate") ||
+      pickTag(block, "updated") ||
+      pickTag(block, "published") ||
+      "";
+
+    if (title && link) items.push({ title, link, pubDate });
+  }
+  return items;
+}
+
+async function openaiSummarize({ title, url, sourceName }) {
+  const prompt = `
+あなたは「競艇ニュースまとめ」編集長です。
+以下のニュースを“まとめサイト用の記事”に編集してください。
+
+【制約】
+- 断定しすぎない（未確認情報は「〜と報じられています」等）
+- 誇張煽り禁止
+- 初心者にわかる説明を入れる
+- 出力は必ずJSONだけ
+
+【入力】
+タイトル: ${title}
+URL
