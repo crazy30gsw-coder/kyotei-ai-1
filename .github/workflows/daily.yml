@@ -21,10 +21,10 @@ jobs:
         run: npm install node-fetch@3
 
       - name: Run update script
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || secrets.KKK }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN || secrets.GH_TOKEN }}
-        run: node tools/update_posts.js
+  env:
+    OPENAI_API_KEY: ${{ secrets.KKK }}
+    GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+  run: node tools/update_posts.js
 
       - name: Commit & Push
         run: |
