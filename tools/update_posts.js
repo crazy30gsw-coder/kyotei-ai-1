@@ -1,6 +1,5 @@
 import fs from "fs";
 import path from "path";
-import fetch from "node-fetch";
 
 const POSTS_JSON = "posts.json";
 const POSTS_DIR = "posts";
