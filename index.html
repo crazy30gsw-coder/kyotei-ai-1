@@ -21,49 +21,37 @@
     <div id="error" class="err" style="display:none"></div>
   </div>
 
-  <script>
-    const statusEl = document.getElementById("status");
-    const listEl = document.getElementById("list");
-    const errEl = document.getElementById("error");
+    <script>
+const statusEl = document.getElementById("status");
+const listEl = document.getElementById("list");
+const errorEl = document.getElementById("error");
 
-    function showError(msg){
-      statusEl.textContent = "読み込み失敗";
-      errEl.style.display = "block";
-      errEl.textContent = msg;
+fetch("posts.json?ts=" + Date.now())
+  .then(res => {
+    if (!res.ok) throw new Error("posts.json fetch failed: " + res.status);
+    return res.json();
+  })
+  .then(posts => {
+    statusEl.textContent = "更新済み";
+
+    if (!posts.length) {
+      listEl.innerHTML = "<p class='muted'>まだ記事がありません</p>";
+      return;
     }
 
-    (async () => {
-      try{
-        const res = await fetch("posts.json?ts=" + Date.now(), { cache:"no-store" });
-        if(!res.ok) throw new Error("posts.json fetch failed: " + res.status + " " + res.statusText);
-        const posts = await res.json();
-        if(!Array.isArray(posts)) throw new Error("posts.json is not an array");
-
-        statusEl.textContent = `記事数: ${posts.length}`;
-        listEl.innerHTML = posts.slice(0, 30).map(p => {
-          const title = (p.title || "（無題）");
-          const summary = (p.summary || "");
-          const date = (p.date || "");
-          const link = (p.link || "#");
-          return `
-            <div class="card">
-              <div><a href="${link}"><b>${escapeHtml(title)}</b></a></div>
-              <div class="muted">${escapeHtml(date)}</div>
-              <div>${escapeHtml(summary)}</div>
-            </div>
-          `;
-        }).join("");
-
-      }catch(e){
-        showError(String(e));
-      }
-    })();
-
-    function escapeHtml(s){
-      return String(s).replace(/[&<>"']/g, c => (
-        {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]
-      ));
-    }
-  </script>
+    listEl.innerHTML = posts.map(p => `
+      <div class="card">
+        <a href="${p.link}" target="_blank">
+          <strong>${p.title}</strong>
+        </a>
+      </div>
+    `).join("");
+  })
+  .catch(err => {
+    statusEl.textContent = "読み込み失敗";
+    errorEl.style.display = "block";
+    errorEl.textContent = err.message;
+  });
+</script>
 </body>
 </html>
