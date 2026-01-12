@@ -1,14 +1,12 @@
-name: Daily Update
+name: Daily Auto Post
+
 on:
   schedule:
-    - cron: "0 15 * * *"   # 日本時間 0:00（UTC 15:00）
+    - cron: "0 */6 * * *" # 6時間ごと
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  update:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,13 +15,15 @@ jobs:
         with:
           node-version: 20
 
-      - name: Update posts.json
-        run: node tools/update_posts.js
+      - run: node tools/update_posts.js
+        env:
+          KKK: ${{ secrets.KKK }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      - name: Commit & push
+      - name: Commit and push
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add posts.json
-          git commit -m "daily update" || echo "no changes"
+          git config user.name "auto-bot"
+          git config user.email "bot@example.com"
+          git add .
+          git commit -m "auto: new post" || echo "no change"
           git push
