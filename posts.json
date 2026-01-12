@@ -1,5 +1,12 @@
 [
   {
+    "id": 1768177891126,
+    "title": "【テスト】GitHub Actions から記事生成",
+    "summary": "自動生成テスト記事",
+    "date": "2026-01-12T00:31:31.126Z",
+    "link": "./posts/1768177891126.html"
+  },
+  {
     "id": 1768175379003,
     "title": "【テスト】OPENAI_API_KEY未設定（仮記事）",
     "summary": "OPENAI_API_KEY が未登録なので仮記事を生成しました。Secretsを確認してください。",
