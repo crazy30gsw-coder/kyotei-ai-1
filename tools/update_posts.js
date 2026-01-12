@@ -35,4 +35,4 @@ posts.unshift({
 
 fs.writeFileSync(POSTS_JSON, JSON.stringify(posts, null, 2), "utf-8");
 
-console.log("✅ 記事を1件追加しました");
+console.log("✅ 記事を1件追加しました");await fs.writeFile("index.html", renderIndex(posts));
